@@ -1,0 +1,345 @@
+writeLines('PATH="${RTOOLS40_HOME}\\usr\\bin;${PATH}"', con = "~/.Renviron")
+install.packages("dplyr")
+install.packages("ggplot2")
+getwd()
+setwd("C:\\Users\\PC")
+library("dplyr")
+library("ggplot2")
+library("readxl")
+library("knitr")
+library (autoplot)
+
+#load the dataset
+df= readxl::read_excel("C:\\Users\\PC\\Desktop\\R PROJE Verileri\\yillik.xlsx")
+plot(df, main="Yıllık İhracatımzın Analizi")
+
+
+par(mfrow=c(2,2))
+#dataframe ve time series
+df1=ts(df, start=c(1994), end=c(2021))
+plot.ts(df1)
+str(df1)
+
+logdf1 <- log(df1)
+plot.ts(logdf1)
+
+library("TTR")
+
+ihracat_ts = ts(data = df$ihracat,start=c(1994), end=c(2021))
+
+
+ihracat_tsSMA3 <- SMA(ihracat_ts,n=3)
+ihracat_tsSMA5 <- SMA(ihracat_ts,n=5)
+ihracat_tsSMA8 <- SMA(ihracat_ts,n=8)
+ihracat_tsSMA12 <- SMA(ihracat_ts,n=12)
+
+library(reshape)
+
+
+plot(ihracat_tsSMA3,main="SMA3")
+plot(ihracat_tsSMA5,main="SMA5")
+plot(ihracat_tsSMA8,main="SMA8")
+plot(ihracat_tsSMA12,main="SMA12")
+
+ihracat_tscomponents <- decompose(ihracat_ts)
+plot(ihracat_tscomponents)
+
+
+ihracat_tscomponentsseasonallyadjusted <- ihracat_ts - ihracat_tscomponents$seasonal
+plot(ihracat_tscomponentsseasonallyadjusted)
+
+library(tidyverse)
+library(tidyquant)
+library(gridExtra)
+library(tibbletime)
+library(forecast)
+library(itsmr)
+library(here)
+library(fpp2)
+library(tseries)
+
+
+logihracat_ts <- log(ihracat_ts)
+plot.ts(logihracat_ts)
+
+HW1 <- HoltWinters(ihracat_ts)
+HW2 <- HoltWinters(ihracat_ts, beta=FALSE, gamma=FALSE)
+plot(ihracat_ts, ylab="İhracat Değeri", xlim=c(1994,2021))
+lines(HW1$fitted[,1], lty=2, col="blue")
+lines(HW2$fitted[,1], lty=2, col="red")
+
+
+HW1.pred <- predict(HW1, 2, prediction.interval = TRUE, level=0.95)
+
+#Visually evaluate the prediction
+plot(ihracat_ts, ylab="İhracat Değeri", xlim=c(1994,2021))
+lines(HW1$fitted[,1], lty=2, col="blue")
+lines(HW1.pred[,1], col="red")
+lines(HW1.pred[,2], lty=2, col="orange")
+lines(HW1.pred[,3], lty=2, col="orange")
+
+ihracat_tsforecasts$fitted
+plot(ihracat_tsforecasts)
+
+
+library("forecast")
+
+HW3 <- HoltWinters(ihracat_ts, seasonal = "multiplicative")
+HW3.pred <- predict(HW3, 2, prediction.interval = TRUE, level=0.95)
+plot(ihracat_ts, ylab="İhracat Değeri", xlim=c(1994,2021), main="Multiplicative")
+lines(HW3$fitted[,1], lty=2, col="blue")
+lines(HW3.pred[,1], col="red")
+lines(HW3.pred[,2], lty=2, col="orange")
+lines(HW3.pred[,3], lty=2, col="orange")
+
+library(forecast)
+HW1_for <- forecast:: forecast(HW1, h=5, level=0.95)
+
+#visualize our predictions:
+plot(HW1_for, xlim=c(1994, 2021))
+lines(HW1_for$fitted, lty=5, col="purple")
+
+acf(HW1_for$residuals, lag.max=20, na.action=na.pass)
+pacf(HW1_for$residuals, lag.max=20, na.action=na.pass)
+Box.test(HW1_for$residuals, lag=20, type="Ljung-Box")
+hist(HW1_for$residuals)
+
+
+ihracat_tsdiff1 <- diff(ihracat_ts, differences=1)
+plot.ts(ihracat_tsdiff1)
+
+acf(ihracat_tsdiff1, lag.max=20) # plot a correlogram
+acf(ihracat_tsdiff1, lag.max=20, plot=FALSE)
+pacf(ihracat_tsdiff1, lag.max=20) # plot a correlogram
+pacf(ihracat_tsdiff1, lag.max=20, plot=FALSE)
+
+ggAcf(ihracat_tscomponentsseasonallyadjusted) # ACF
+ggPacf(ihracat_tscomponentsseasonallyadjusted) # PACF
+
+adf.test(ihracat_tscomponentsseasonallyadjusted)
+kpss.test(ihracat_tscomponentsseasonallyadjusted)
+
+
+ihracat_tscomponentsseasonallyadjusted_arima = auto.arima(ihracat_tscomponentsseasonallyadjusted,
+                             stepwise=FALSE,
+                             approximation=FALSE,
+                             seasonal=FALSE,
+                             allowdrift=FALSE
+                             ) 
+summary(ihracat_tscomponentsseasonallyadjusted_arima)
+
+autoplot(ihracat_tscomponentsseasonallyadjusted_arima) # plot the residuals 
+plot(ihracat_tscomponentsseasonallyadjusted_arima) # inspect the roots  
+ggAcf(residuals(ihracat_tscomponentsseasonallyadjusted_arima),lag.max=36) # inspect the ACF 
+ggPacf(residuals(ihracat_tscomponentsseasonallyadjusted_arima),lag.max=36) # inspect the PACF 
+
+adf.test(residuals(ihracat_tscomponentsseasonallyadjusted_arima))
+kpss.test(residuals(ihracat_tscomponentsseasonallyadjusted_arima))
+
+checkresiduals(ihracat_tscomponentsseasonallyadjusted_arima)
+
+ihracat_tscomponentsseasonallyadjusted_sarima = auto.arima(ihracat_tscomponentsseasonallyadjusted,
+                             stepwise=FALSE,
+                             approximation=FALSE,
+                             seasonal=FALSE,
+                             allowdrift=FALSE
+                             ) 
+summary(ihracat_tscomponentsseasonallyadjusted_sarima)
+
+autoplot(ihracat_tscomponentsseasonallyadjusted_sarima) # plot the residuals 
+plot(ihracat_tscomponentsseasonallyadjusted_sarima) # inspect the roots  
+ggAcf(residuals(ihracat_tscomponentsseasonallyadjusted_sarima),lag.max=36) # inspect the ACF 
+ggPacf(residuals(ihracat_tscomponentsseasonallyadjusted_sarima),lag.max=36) # inspect the PACF 
+
+
+
+# split the data into train and test 
+ihracat_train <- window(ihracat_ts, end=c(2018))
+ihracat_test <- window(ihracat_ts, start=c(2019))
+
+
+# train sarima model 
+ihracat_sarima2 = auto.arima(ihracat_train,
+                              stepwise=FALSE,
+                              approximation=FALSE,
+                              seasonal=TRUE,
+                              allowdrift=FALSE, 
+                              trace=FALSE)
+
+## produce forecasts 
+myforecasts <- forecast::forecast(ihracat_sarima2 , h=2) 
+
+## plot the forecasts
+autoplot(myforecasts) + autolayer(ihracat_ts) + xlim(1994,2022) 
+
+
+
+# ARIMA
+myforecasts['model']
+accuracy(myforecasts)
+
+# HW 
+HW1_for['model']
+accuracy(HW1_for)
+
+naive_mod <- naive(ihracat_test , h = 2)
+summary(naive_mod)
+
+se_model <- ses(ihracat_test, h = 2)
+summary(se_model)
+
+holt_model <- holt(ihracat_test, h = 2)
+summary(holt_model)
+
+arima_model <- auto.arima(ihracat_test)
+summary(arima_model)
+
+model_tbats <- tbats(ihracat_test)
+summary(model_tbats)
+
+library(fpp3)
+
+
+library(tidyverse) #Data Wrangling
+
+
+library(GGally) #Data Visualization
+library(boot) #Resampling methods
+library(rpart) #Tree modeling
+library(rattle) #Better Vizzes
+library(mgcv) #GAM modeling
+library(neuralnet) #Neural Networks Model
+library(plyr) #Data Wrangling
+library(caret) #Cross Validation for Neural Networks
+library(e1071) #SVM model
+library(randomForest) #Random Forest
+library(gbm) #Gradient Boosting
+library(caTools) #splitting
+library(rpart)
+library(rpart.plot)
+library(ROCR)
+library(dygraphs)
+
+train<-ihracat_train
+test<-ihracat_test
+
+df_train <- window(df1, end=c(2018))
+df_test <- window(df1, start=c(2019))
+
+library(GGally)
+# correlation for all variables
+round(cor(df),
+  digits = 2 # rounded to 2 decimals
+)
+    
+# improved correlation matrix
+library(corrplot)
+
+corrplot(cor(df),
+  method = "number",
+  type = "upper" # show only upper side
+)
+
+## plot with statistical results
+library(ggstatsplot)
+ggscatterstats(
+  data = df,
+  x = w_gdp,
+  y = ihracat,
+  bf.message = FALSE
+)
+    
+# Fitting Simple Linear Regression to the Training set
+lm.r = lm(formula = ihracat ~ w_gdp,
+                          data = df_train)
+coef(lm.r)
+ 
+# Predicting the Test set results
+ypred = predict(lm.r, newdata = df_test)
+ 
+print(lm.r)
+
+# Create regression model
+model <- lm(formula = ihracat ~ ithalat + w_gdp + t_gdp + t_ufe,
+            data = df_train)
+ 
+# Print the regression model
+cat("Regression model:\n")
+print(model)
+
+# Plot
+plot(model, main="Multiple Regresyon")
+
+
+df_train
+df_test
+library (caret)
+
+
+#glm regression model
+glm_model <- glm(x~., data=ihracat_train)
+
+#view model summary
+summary(glm_model)
+
+#use model to predict value 
+glm_predict<-predict(glm_model,df_test, type="response")
+
+ 
+
+svm_model <- svm(ihracat ~ ., data=df_train)
+print(svm_model)
+summary(svm_model)
+svm_predict<-predict(svm_model,df_test, type="response")
+
+
+
+rf <- randomForest(
+  ihracat ~ .,
+  data=df_train
+)
+print(rf)
+summary(rf)
+
+
+glm_predict
+svm_predict
+rf_predict
+
+
+
+ihracat_test2=as.ts(ihracat_test)
+d_glm=ihracat_test2-glm_predict
+
+mse_glm<- mean((d_glm)^2)
+mae_glm<- mean(abs(d_glm))
+rmse_glm<- sqrt(mse)
+R2_glm<-1-(sum((d_glm)^2)/sum((ihracat_test2-mean(ihracat_test2))^2))
+
+cat("GLM","\n", "MAE:", mae_glm, "\n", "MSE:", mse_glm, "\n", 
+    "RMSE:", rmse_glm, "\n", "R-squared:", R2_glm)
+
+ihracat_test2=as.ts(ihracat_test)
+d_svm=ihracat_test2-svm_predict
+
+mse_svm<- mean((d_svm)^2)
+mae_svm<- mean(abs(d_svm))
+rmse_svm<- sqrt(mse)
+R2_svm<- 1-(sum((d_svm)^2)/sum((ihracat_test2-mean(ihracat_test2))^2))
+
+cat("SVM","\n", "MAE:", mae_svm, "\n", "MSE:", mse_svm, "\n", 
+    "RMSE:", rmse_svm, "\n", "R-squared:", R2_svm)
+
+ihracat_test2=as.ts(ihracat_test)
+d_rf=ihracat_test2-rf_predict
+
+mse_rf<- mean((d_rf)^2)
+mae_rf<-mean(abs(d_rf))
+rmse_rf<- sqrt(mse)
+R2_rf<- 1-(sum((d_rf)^2)/sum((ihracat_test2-mean(ihracat_test2))^2))
+
+cat("RF","\n", "MAE:", mae_rf, "\n", "MSE:", mse_rf, "\n", 
+    "RMSE:", rmse_rf, "\n", "R-squared:", R2_rf)
+
+
+
